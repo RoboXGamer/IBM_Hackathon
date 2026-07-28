@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock Prototype</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; background: #111; color: #ccc; }
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 16px; background: #1a1a1a; border-bottom: 1px solid #333;
+  flex-shrink: 0; height: 42px;
+}
+
+.topbar button {
+  background: #333; color: #ccc; border: none; border-radius: 4px; padding: 4px 12px;
+  font-size: 13px; cursor: pointer;
+}
+.topbar button:disabled { opacity: .3; cursor: default; }
+.topbar button:hover:not(:disabled) { background: #444; }
+.topbar .name { font-size: 13px; font-weight: 600; color: #ddd; min-width: 80px; text-align: center; }
+.dots { display: flex; gap: 5px; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #444; cursor: pointer; }
+.dot.active { background: #aaa; }
+.img-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; }
+.img-wrap img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.mobile-img img { max-width: 375px; }
+.toggle { font-size: 11px; padding: 4px 10px !important; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="toggle" id="toggleBtn">🖥️ Desktop</button>
+  <button id="prevBtn">&lt;</button>
+  <span class="name" id="screenName">—</span>
+  <div class="dots" id="dots"></div>
+  <button id="nextBtn">&gt;</button>
+</div>
+<div class="img-wrap" id="imgWrap">
+  <img id="screenImg" src="" alt="screen">
+</div>
+<script>
+const desktop = [
+  'today_screen.png','study_screen.png','plan_screen.png',
+  'quiz_screen.png','notes_screen.png','performance_screen.png'
+];
+const mobile = [
+  'today_screen_mobile.png','study_screen_mobile.png','plan_screen_mobile.png',
+  'quiz_screen_mobile.png','notes_screen_mobile.png','performance_screen_mobile.png'
+];
+const labels = ['Today','Study','Plan','Quiz','Notes','Performance'];
+let i = 0, isMob = false;
+const img = document.getElementById('screenImg');
+const wrap = document.getElementById('imgWrap');
+const nameEl = document.getElementById('screenName');
+const toggleBtn = document.getElementById('toggleBtn');
+const dotsEl = document.getElementById('dots');
+const toggleEl = document.getElementById('toggleBtn');
+
+function list() { return isMob ? mobile : desktop; }
+function render() {
+  const l = list();
+  img.src = 'mocks/' + l[i];
+  wrap.className = 'img-wrap' + (isMob ? ' mobile-img' : '');
+  toggleBtn.textContent = isMob ? '📱 Mobile' : '🖥️ Desktop';
+  nameEl.textContent = labels[i];
+  document.getElementById('prevBtn').disabled = i === 0;
+  document.getElementById('nextBtn').disabled = i === l.length - 1;
+  dotsEl.innerHTML = '';
+  l.forEach((_, j) => {
+    const d = document.createElement('span');
+    d.className = 'dot' + (j === i ? ' active' : '');
+    d.onclick = () => { i = j; render(); };
+    dotsEl.appendChild(d);
+  });
+}
+document.getElementById('prevBtn').onclick = () => { if (i > 0) { i--; render(); } };
+document.getElementById('nextBtn').onclick = () => { if (i < list().length - 1) { i++; render(); } };
+toggleBtn.onclick = () => { isMob = !isMob; i = Math.min(i, list().length - 1); render(); };
+render();
+</script>
+</body>
+</html>
