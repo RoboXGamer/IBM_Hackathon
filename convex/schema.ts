@@ -2,14 +2,14 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  profiles: defineTable({ authId: v.string(), name: v.string(), email: v.string(), grade: v.string(), level: v.number(), points: v.number(), streak: v.number(), avatarColor: v.string(), notificationCount: v.number(), createdAt: v.number(), updatedAt: v.number() })
+  profiles: defineTable({ authId: v.string(), name: v.string(), email: v.string(), grade: v.string(), level: v.number(), points: v.number(), streak: v.number(), avatarColor: v.string(), notificationCount: v.number(), onboardingComplete: v.optional(v.boolean()), dailyGoalMinutes: v.optional(v.number()), subjects: v.optional(v.array(v.string())), createdAt: v.number(), updatedAt: v.number() })
     .index("by_auth_id", ["authId"]).index("by_email", ["email"]),
   notes: defineTable({ userId: v.id("profiles"), title: v.string(), fileName: v.string(), subject: v.string(), grade: v.string(), topic: v.optional(v.string()), tags: v.array(v.string()), storageId: v.optional(v.id("_storage")), fileType: v.union(v.literal("pdf"), v.literal("doc"), v.literal("slides"), v.literal("image"), v.literal("text")), sizeLabel: v.string(), progress: v.number(), status: v.union(v.literal("ready"), v.literal("processing"), v.literal("complete"), v.literal("failed")), uploadedAt: v.number() })
     .index("by_user", ["userId"]).index("by_user_and_subject", ["userId", "subject"]),
   studyTasks: defineTable({ userId: v.id("profiles"), time: v.string(), title: v.string(), detail: v.string(), kind: v.union(v.literal("Study"), v.literal("Quiz"), v.literal("Explain"), v.literal("Session")), target: v.union(v.literal("study"), v.literal("quiz"), v.literal("plan")), completed: v.boolean(), sortOrder: v.number() })
     .index("by_user_and_order", ["userId", "sortOrder"]),
   explanations: defineTable({ userId: v.id("profiles"), noteId: v.optional(v.id("notes")), title: v.string(), generatedBy: v.string(), subject: v.string(), topic: v.string(), grade: v.string(), introTitle: v.string(), introBody: v.string(), formula: v.string(), active: v.boolean() })
-    .index("by_user_and_active", ["userId", "active"]),
+    .index("by_user", ["userId"]).index("by_user_and_active", ["userId", "active"]),
   explanationSteps: defineTable({ explanationId: v.id("explanations"), order: v.number(), icon: v.string(), tone: v.union(v.literal("violet"), v.literal("green"), v.literal("blue"), v.literal("amber")), title: v.string(), body: v.string() })
     .index("by_explanation_and_order", ["explanationId", "order"]),
   keyPoints: defineTable({ explanationId: v.id("explanations"), order: v.number(), text: v.string() })
@@ -24,7 +24,7 @@ export default defineSchema({
     .index("by_user_and_active", ["userId", "active"]),
   revisionTasks: defineTable({ planId: v.id("revisionPlans"), day: v.number(), title: v.string(), topics: v.array(v.string()), durationMinutes: v.number(), completed: v.boolean(), completedAt: v.optional(v.number()) })
     .index("by_plan_and_day", ["planId", "day"]),
-  quizSets: defineTable({ userId: v.id("profiles"), title: v.string(), subject: v.string(), topic: v.string(), questionCount: v.number(), durationMinutes: v.number(), difficulty: v.union(v.literal("Easy"), v.literal("Medium"), v.literal("Hard")), recommended: v.boolean(), active: v.boolean() })
+  quizSets: defineTable({ userId: v.id("profiles"), noteId: v.optional(v.id("notes")), title: v.string(), subject: v.string(), topic: v.string(), questionCount: v.number(), durationMinutes: v.number(), difficulty: v.union(v.literal("Easy"), v.literal("Medium"), v.literal("Hard")), recommended: v.boolean(), active: v.boolean() })
     .index("by_user", ["userId"]).index("by_user_and_active", ["userId", "active"]),
   quizQuestions: defineTable({ quizSetId: v.id("quizSets"), order: v.number(), subject: v.string(), topic: v.string(), question: v.string(), options: v.array(v.string()), answer: v.number(), explanation: v.string(), points: v.number() })
     .index("by_quiz_and_order", ["quizSetId", "order"]),

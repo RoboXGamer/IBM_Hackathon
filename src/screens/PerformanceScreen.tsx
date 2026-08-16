@@ -1,4 +1,4 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import type { RoutePath } from "../types";
 import type { AppData } from "../data/types";
 import { Button, Card, IconBadge, Progress } from "../components/ui";
@@ -11,6 +11,7 @@ export function PerformanceScreen(props: { navigate: (path: RoutePath) => void; 
     const link = document.createElement("a"); link.href = url; link.download = "quizzly-performance.csv"; link.click(); URL.revokeObjectURL(url);
   };
   const toneFor = (score: number) => score >= 70 ? "green" as const : "amber" as const;
+  const filteredActivity = createMemo(() => period() === "Last 7 days" ? props.data.activity.slice(-7) : period() === "Last 30 days" ? props.data.activity.slice(-30) : props.data.activity);
 
   return (
     <div class="page-stack">
@@ -18,7 +19,7 @@ export function PerformanceScreen(props: { navigate: (path: RoutePath) => void; 
       <div class="metrics-grid"><For each={props.data.metrics}>{(metric) => <Card class="metric-card"><IconBadge icon={metric.icon} tone={metric.tone} size="lg" /><div><small>{metric.label}</small><strong>{metric.value}</strong><span>{metric.change}</span></div><Progress value={metric.progress} tone={metric.tone} /></Card>}</For></div>
       <div class="dashboard-layout performance-layout">
         <div class="main-column">
-          <Card><div class="section-heading"><div><h2>Accuracy trend</h2><p>Your quiz accuracy over the recorded period</p></div><span class="status-pill">{period()}</span></div><div class="trend-chart" aria-label="Quiz accuracy trend"><div class="chart-grid-lines"><span>100%</span><span>75%</span><span>50%</span><span>25%</span></div><div class="chart-points"><For each={props.data.activity}>{(item, index) => <div class="chart-point" style={{ left: `${index() * (100 / Math.max(1, props.data.activity.length - 1))}%`, bottom: `${item.accuracy}%` }}><b>{item.accuracy}%</b><i /><small>{item.label}</small></div>}</For></div><div class="chart-line" /></div></Card>
+          <Card><div class="section-heading"><div><h2>Accuracy trend</h2><p>{filteredActivity().length} recorded learning days</p></div><span class="status-pill">{period()}</span></div><Show when={filteredActivity().length > 0} fallback={<div class="small-empty"><strong>No activity in this period</strong><p>Complete a quiz to begin your performance history.</p></div>}><div class="trend-chart" aria-label="Quiz accuracy trend"><div class="chart-grid-lines"><span>100%</span><span>75%</span><span>50%</span><span>25%</span></div><div class="chart-points"><For each={filteredActivity()}>{(item, index) => <div class="chart-point" style={{ left: `${index() * (100 / Math.max(1, filteredActivity().length - 1))}%`, bottom: `${item.accuracy}%` }}><b>{item.accuracy}%</b><i /><small>{item.label}</small></div>}</For></div><div class="chart-line" /></div></Show></Card>
           <div class="split-grid">
             <Card><div class="section-heading compact"><div><h2>Topic mastery</h2><p>Where your learning stands</p></div></div><div class="mastery-list"><For each={props.data.mastery}>{(topic) => <div><IconBadge icon={topic.icon} tone={toneFor(topic.score)} size="sm" /><strong>{topic.name}</strong><Progress value={topic.score} tone={toneFor(topic.score)} /><b>{topic.score}%</b><span class={`status-pill ${topic.score > 70 ? "status-success" : "status-warning"}`}>{topic.score > 85 ? "Excellent" : topic.score > 70 ? "Good" : "Needs work"}</span></div>}</For></div></Card>
             <Card><div class="section-heading compact"><div><h2>Recent quiz results</h2><p>Your latest attempts</p></div></div><div class="results-table"><div class="table-head"><span>Quiz</span><span>Score</span><span>Status</span><span>Change</span></div><For each={props.data.attempts}>{(row) => { const percent = Math.round(row.score / Math.max(1, row.total) * 100); return <div><span><strong>{row.title}</strong><small>{row.subject} · {row.total} questions</small></span><b class={percent < 60 ? "text-amber" : "text-green"}>{percent}%</b><span class="status-pill status-success">✓ Done</span><b class={row.change < 0 ? "text-rose" : "text-green"}>{row.change >= 0 ? "↑" : "↓"} {Math.abs(row.change)}%</b></div>; }}</For></div></Card>

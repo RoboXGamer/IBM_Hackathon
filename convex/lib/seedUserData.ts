@@ -1,7 +1,29 @@
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 
+export async function ensureUserInterfaceData(ctx: MutationCtx, userId: Id<"profiles">) {
+  const existing = await ctx.db.query("uiItems").withIndex("by_user_and_group", (query) => query.eq("userId", userId).eq("group", "quick-actions")).first();
+  if (existing) return false;
+  const tip = await ctx.db.query("tips").withIndex("by_user_and_active", (query) => query.eq("userId", userId).eq("active", true)).first();
+  if (!tip) await ctx.db.insert("tips", { userId, title: "Daily tip", body: "Break big topics into 15–20 minute focused sessions. Your brain remembers beginnings and endings best.", icon: "✦", active: true });
+  const uiItems = [
+    ["quick-actions", 1, "Upload notes", "Add study material", "↑", "violet", "notes"],
+    ["quick-actions", 2, "Start active quiz", "Practice what you know", "☷", "green", "quiz"],
+    ["quick-actions", 3, "Open revision plan", "Continue your schedule", "◎", "amber", "plan"],
+    ["quick-actions", 4, "Ask AI", "Clear a doubt", "✦", "violet", "study"],
+    ["upload-workflow", 1, "Upload securely", "Your original file is stored in Convex File Storage.", "1", "violet", undefined],
+    ["upload-workflow", 2, "Add learning context", "Subject, grade, and topic keep generated material relevant.", "2", "violet", undefined],
+    ["upload-workflow", 3, "Build a study kit", "Explanations, practice, and revision tasks stay connected to the note.", "3", "violet", undefined],
+    ["upload-workflow", 4, "Improve with activity", "Quiz results and completed tasks update your recommendations.", "4", "violet", undefined],
+    ["plan-reviews", 1, "Chlorophyll", "Day 2", "↻", "green", "study"],
+    ["plan-reviews", 2, "CO₂ fixation", "Day 3", "↻", "green", "study"],
+  ] as const;
+  await Promise.all(uiItems.map(([group, order, title, detail, icon, tone, target]) => ctx.db.insert("uiItems", { userId, group, order, title, detail, icon, tone, target })));
+  return true;
+}
+
 export async function seedUserData(ctx: MutationCtx, userId: Id<"profiles">) {
+  await ensureUserInterfaceData(ctx, userId);
   const existing = await ctx.db.query("notes").withIndex("by_user", (query) => query.eq("userId", userId)).first();
   if (existing) return false;
 
@@ -48,7 +70,7 @@ export async function seedUserData(ctx: MutationCtx, userId: Id<"profiles">) {
   ] as const;
   await Promise.all(planTasks.map(([day, title, topics, durationMinutes, completed]) => ctx.db.insert("revisionTasks", { planId, day, title, topics: [...topics], durationMinutes, completed, completedAt: completed ? now - 3_600_000 : undefined })));
 
-  const quizSetId = await ctx.db.insert("quizSets", { userId, title: "Photosynthesis Basics", subject: "Biology", topic: "Photosynthesis", questionCount: 5, durationMinutes: 8, difficulty: "Easy", recommended: true, active: true });
+  const quizSetId = await ctx.db.insert("quizSets", { userId, noteId, title: "Photosynthesis Basics", subject: "Biology", topic: "Photosynthesis", questionCount: 5, durationMinutes: 8, difficulty: "Easy", recommended: true, active: true });
   const suggestedQuizIds = await Promise.all([
     ctx.db.insert("quizSets", { userId, title: "Chlorophyll & Its Role", subject: "Biology", topic: "Chlorophyll", questionCount: 10, durationMinutes: 8, difficulty: "Easy", recommended: true, active: false }),
     ctx.db.insert("quizSets", { userId, title: "Factors Affecting Photosynthesis", subject: "Biology", topic: "Photosynthesis factors", questionCount: 12, durationMinutes: 10, difficulty: "Medium", recommended: true, active: false }),
@@ -78,20 +100,6 @@ export async function seedUserData(ctx: MutationCtx, userId: Id<"profiles">) {
   ] as const;
   await Promise.all(attempts.map(([title, subject, topic, score, total, difficulty, change, age]) => ctx.db.insert("quizAttempts", { userId, quizSetId: title === "Photosynthesis Basics" ? quizSetId : undefined, title, subject, topic, score, total, difficulty, change, completedAt: now - age })));
 
-  await ctx.db.insert("tips", { userId, title: "Daily tip", body: "Break big topics into 15–20 minute focused sessions. Your brain remembers beginnings and endings best.", icon: "✦", active: true });
-  const uiItems = [
-    ["quick-actions", 1, "Upload notes", "Add study material", "↑", "violet", "notes"],
-    ["quick-actions", 2, "Generate quiz", "Practice from notes", "☷", "green", "quiz"],
-    ["quick-actions", 3, "Create plan", "Build a schedule", "◎", "amber", "plan"],
-    ["quick-actions", 4, "Ask AI", "Clear a doubt", "✦", "violet", "study"],
-    ["upload-workflow", 1, "Read and structure", "We identify topics, definitions, and relationships in your notes.", "1", "violet", undefined],
-    ["upload-workflow", 2, "Explain simply", "Your AI buddy creates a grade-aware explanation.", "2", "violet", undefined],
-    ["upload-workflow", 3, "Generate practice", "You receive quizzes and a spaced revision plan.", "3", "violet", undefined],
-    ["upload-workflow", 4, "Adapt over time", "Your weak areas shape what comes next.", "4", "violet", undefined],
-    ["plan-reviews", 1, "Chlorophyll", "Day 2", "↻", "green", "study"],
-    ["plan-reviews", 2, "CO₂ fixation", "Day 3", "↻", "green", "study"],
-  ] as const;
-  await Promise.all(uiItems.map(([group, order, title, detail, icon, tone, target]) => ctx.db.insert("uiItems", { userId, group, order, title, detail, icon, tone, target })));
   await Promise.all([
     ["Ananya", 2450, "#f0a35a", false], ["Rohan", 2300, "#38b98a", false], ["You", 1950, "#7c5cff", true], ["Priya", 1750, "#ec6c8d", false], ["Arjun", 1600, "#4c92ed", false],
   ].map(([name, points, color, isCurrentUser]) => ctx.db.insert("leaderboardEntries", { quizSetId, userId: isCurrentUser ? userId : undefined, name: String(name), points: Number(points), color: String(color), isCurrentUser: Boolean(isCurrentUser), online: true })));

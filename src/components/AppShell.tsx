@@ -15,6 +15,7 @@ const navItems: { path: RoutePath; label: string; sublabel: string; icon: string
 
 export function AppShell(props: ParentProps<{ path: Accessor<RoutePath>; navigate: (path: RoutePath) => void; profile: AppData["profile"] }>) {
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [accountOpen, setAccountOpen] = createSignal(false);
   const auth = useAuth();
   const go = (path: RoutePath) => {
     props.navigate(path);
@@ -48,12 +49,13 @@ export function AppShell(props: ParentProps<{ path: Accessor<RoutePath>; navigat
           </For>
         </nav>
 
-        <div class="sidebar-support"><span class="nav-icon">?</span><span><strong>Need help?</strong><small>Open study guide</small></span></div>
-        <button class="profile-chip" onClick={() => void auth.signOut()} title="Sign out">
+        <button class="sidebar-support" onClick={() => go("/notes")}><span class="nav-icon">?</span><span><strong>Need help?</strong><small>Start with your note library</small></span></button>
+        <button class="profile-chip" onClick={() => setAccountOpen(!accountOpen())} aria-expanded={accountOpen() ? "true" : "false"}>
           <Avatar name={props.profile.name} size="lg" color={props.profile.avatarColor} />
           <span><strong>{props.profile.name}</strong><small>Level {props.profile.level} · {props.profile.points.toLocaleString()} pts</small></span>
-          <span class="ml-auto text-muted">↪</span>
+          <span class="ml-auto text-muted">{accountOpen() ? "⌃" : "⌄"}</span>
         </button>
+        <Show when={accountOpen()}><div class="account-menu"><div><strong>{props.profile.email}</strong><small>{props.profile.grade || "Grade not set"} · {props.profile.dailyGoalMinutes} min/day</small></div><button onClick={() => void auth.signOut()}>Sign out <span>↪</span></button></div></Show>
       </aside>
 
       <main class="app-main">{props.children}</main>

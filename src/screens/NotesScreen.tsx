@@ -1,4 +1,4 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import type { RoutePath } from "../types";
 import type { AppData } from "../data/types";
 import { Button, Card, IconBadge } from "../components/ui";
@@ -40,19 +40,34 @@ export function NotesScreen(props: { navigate: (path: RoutePath) => void; data: 
   const [tags, setTags] = createSignal("");
   const [uploading, setUploading] = createSignal(false);
   const [uploadError, setUploadError] = createSignal("");
+  const [success, setSuccess] = createSignal("");
+  const [search, setSearch] = createSignal("");
+  const [showGuide, setShowGuide] = createSignal(true);
+  const [openingId, setOpeningId] = createSignal<string>();
   const generateUploadUrl = createMutation(api.notes.generateUploadUrl);
   const createNote = createMutation(api.notes.create);
+  const activateNote = createMutation(api.notes.activate);
+  const removeNote = createMutation(api.notes.remove);
   let fileInput!: HTMLInputElement;
+  const filteredNotes = createMemo(() => {
+    const query = search().trim().toLowerCase();
+    return query ? props.data.items.filter((item) => `${item.title} ${item.subject} ${item.topic ?? ""}`.toLowerCase().includes(query)) : props.data.items;
+  });
 
   const addFiles = (files: FileList | null) => {
     if (!files) return;
-    setSelectedFiles((current) => [...current, ...Array.from(files)].slice(0, 5));
+    const incoming = Array.from(files);
+    const oversized = incoming.find((file) => file.size > 50 * 1024 * 1024);
+    if (oversized) { setUploadError(`${oversized.name} is larger than the 50 MB limit.`); return; }
+    setUploadError("");
+    setSelectedFiles((current) => [...current, ...incoming.filter((file) => !current.some((item) => item.name === file.name && item.size === file.size))].slice(0, 5));
   };
 
   const analyze = async () => {
     if (selectedFiles().length === 0) { fileInput.click(); return; }
     setUploading(true);
     setUploadError("");
+    setSuccess("");
     try {
       for (const file of selectedFiles()) {
         const uploadUrl = await generateUploadUrl({});
@@ -62,7 +77,8 @@ export function NotesScreen(props: { navigate: (path: RoutePath) => void; data: 
         await createNote({ title: title() || file.name.replace(/\.[^.]+$/, ""), fileName: file.name, subject: subject() || "General", grade: grade() || "Unspecified", topic: topic() || undefined, tags: tags().split(",").map((tag) => tag.trim()).filter(Boolean), storageId, fileType: fileType(file), sizeLabel: sizeLabel(file.size) });
       }
       setSelectedFiles([]);
-      props.navigate("/study");
+      setTitle(""); setTopic(""); setTags("");
+      setSuccess("Upload complete. Your note is safely stored and ready for the document-processing pipeline.");
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Upload failed. Please try again.");
     } finally {
@@ -70,9 +86,24 @@ export function NotesScreen(props: { navigate: (path: RoutePath) => void; data: 
     }
   };
 
+  const openNote = async (note: NotesData["items"][number]) => {
+    if (!note.studyReady) { setUploadError("This note is stored, but its study kit is not ready yet."); return; }
+    setOpeningId(String(note._id)); setUploadError("");
+    try { await activateNote({ noteId: note._id }); props.navigate("/study"); }
+    catch (reason) { setUploadError(reason instanceof Error ? reason.message : "Could not open this note"); }
+    finally { setOpeningId(undefined); }
+  };
+
+  const deleteNote = async (note: NotesData["items"][number]) => {
+    if (!window.confirm(`Remove ${note.fileName}? This cannot be undone.`)) return;
+    try { await removeNote({ noteId: note._id }); }
+    catch (reason) { setUploadError(reason instanceof Error ? reason.message : "Could not remove this note"); }
+  };
+
   return (
     <div class="page-stack">
-      <header class="page-header"><div><p class="eyebrow">Knowledge base</p><h1>Upload your notes</h1><p>Turn PDFs, documents, and class slides into explanations, quizzes, and a focused revision plan.</p></div><Button variant="secondary">How it works?</Button></header>
+      <header class="page-header"><div><p class="eyebrow">Knowledge base</p><h1>Your notes, organized for action</h1><p>Upload material, track its processing state, and open only the study kits that are ready.</p></div><Button variant="secondary" onClick={() => setShowGuide(!showGuide())}>{showGuide() ? "Hide guide" : "How it works"}</Button></header>
+      <Show when={success()}><div class="inline-notice success"><span>✓</span><p>{success()}</p></div></Show>
       <div class="content-with-rail">
         <div class="main-column">
           <Card>
@@ -96,8 +127,8 @@ export function NotesScreen(props: { navigate: (path: RoutePath) => void; data: 
           </Card>
         </div>
         <aside class="right-rail">
-          <Card><div class="section-heading compact"><div><h2>What happens next?</h2><p>Your notes become an active learning kit.</p></div></div><ol class="steps-list"><For each={props.data.workflow}>{(step) => <li><span>{step.icon}</span><p><strong>{step.title}</strong><br />{step.detail}</p></li>}</For></ol></Card>
-          <Card><div class="section-heading compact"><div><h2>Recent uploads</h2><p>{props.data.items.length} items</p></div><button class="text-button">View all</button></div><div class="upload-list"><For each={props.data.items}>{(item) => <button onClick={() => props.navigate("/study")}><IconBadge icon={item.fileType === "slides" ? "P" : item.fileType === "doc" ? "W" : "▤"} tone={item.fileType === "doc" ? "blue" : item.fileType === "slides" ? "amber" : "rose"} /><span><strong>{item.fileName}</strong><small>{item.subject} · {item.grade}</small><small>{timeLabel(item.uploadedAt)} · {item.sizeLabel}</small></span><b>{item.status === "complete" ? "✓" : `${item.progress}%`}</b></button>}</For></div></Card>
+          <Show when={showGuide()}><Card><div class="section-heading compact"><div><h2>What happens next?</h2><p>A transparent path from file to practice</p></div></div><ol class="steps-list"><For each={props.data.workflow}>{(step) => <li><span>{step.icon}</span><p><strong>{step.title}</strong><br />{step.detail}</p></li>}</For></ol></Card></Show>
+          <Card><div class="section-heading compact"><div><h2>Note library</h2><p>{filteredNotes().length} of {props.data.items.length} notes</p></div></div><label class="library-search"><span>⌕</span><input value={search()} onInput={(event) => setSearch(event.currentTarget.value)} placeholder="Search by title, subject, or topic" /></label><div class="upload-list actionable"><For each={filteredNotes()}>{(item) => <article><IconBadge icon={item.fileType === "slides" ? "P" : item.fileType === "doc" ? "W" : "▤"} tone={item.fileType === "doc" ? "blue" : item.fileType === "slides" ? "amber" : "rose"} /><span><strong>{item.fileName}</strong><small>{item.subject} · {item.grade}</small><small>{timeLabel(item.uploadedAt)} · {item.sizeLabel}</small></span><div class="note-row-actions"><span class={`status-pill ${item.studyReady ? "status-success" : "status-warning"}`}>{item.studyReady ? "Study kit ready" : item.status}</span><button class="text-button" disabled={!item.studyReady || openingId() === String(item._id)} onClick={() => void openNote(item)}>{openingId() === String(item._id) ? "Opening…" : "Open"}</button><button class="icon-danger" onClick={() => void deleteNote(item)} aria-label={`Delete ${item.fileName}`}>×</button></div></article>}</For><Show when={filteredNotes().length === 0}><div class="small-empty"><strong>No matching notes</strong><p>Try a different search or upload new material.</p></div></Show></div></Card>
         </aside>
       </div>
     </div>

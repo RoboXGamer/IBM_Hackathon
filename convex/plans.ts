@@ -21,6 +21,14 @@ export const toggleTask = mutation({ args: { taskId: v.id("revisionTasks") }, ha
   return completed;
 } });
 
+export const reset = mutation({ args: { planId: v.id("revisionPlans") }, handler: async (ctx, args) => {
+  const profile = await requireProfile(ctx);
+  const plan = await ctx.db.get(args.planId);
+  if (!plan || plan.userId !== profile._id) throw new Error("Plan not found");
+  const tasks = await ctx.db.query("revisionTasks").withIndex("by_plan_and_day", (q) => q.eq("planId", plan._id)).collect();
+  await Promise.all(tasks.map((task) => ctx.db.patch(task._id, { completed: false, completedAt: undefined })));
+} });
+
 export const create = mutation({
   args: { noteId: v.optional(v.id("notes")), subject: v.string(), topic: v.string(), confidenceGoal: v.number(), tasks: v.array(v.object({ day: v.number(), title: v.string(), topics: v.array(v.string()), durationMinutes: v.number() })) },
   handler: async (ctx, args) => {

@@ -5,7 +5,7 @@ export const get = query({
   args: {},
   handler: async (ctx) => {
     const profile = await requireProfile(ctx);
-    const [notes, studyTasks, quizSets, attempts, activity, mastery, tip, plan, explanation, insights, milestones, quickActions, uploadWorkflow, planReviews] = await Promise.all([
+    const [notes, studyTasks, quizSets, attempts, activity, mastery, tip, plan, explanations, insights, milestones, quickActions, uploadWorkflow, planReviews] = await Promise.all([
       ctx.db.query("notes").withIndex("by_user", (q) => q.eq("userId", profile._id)).order("desc").collect(),
       ctx.db.query("studyTasks").withIndex("by_user_and_order", (q) => q.eq("userId", profile._id)).collect(),
       ctx.db.query("quizSets").withIndex("by_user", (q) => q.eq("userId", profile._id)).collect(),
@@ -14,7 +14,7 @@ export const get = query({
       ctx.db.query("topicMastery").withIndex("by_user_and_score", (q) => q.eq("userId", profile._id)).collect(),
       ctx.db.query("tips").withIndex("by_user_and_active", (q) => q.eq("userId", profile._id).eq("active", true)).first(),
       ctx.db.query("revisionPlans").withIndex("by_user_and_active", (q) => q.eq("userId", profile._id).eq("active", true)).first(),
-      ctx.db.query("explanations").withIndex("by_user_and_active", (q) => q.eq("userId", profile._id).eq("active", true)).first(),
+      ctx.db.query("explanations").withIndex("by_user", (q) => q.eq("userId", profile._id)).collect(),
       ctx.db.query("insights").withIndex("by_user_and_order", (q) => q.eq("userId", profile._id)).collect(),
       ctx.db.query("milestones").withIndex("by_user", (q) => q.eq("userId", profile._id)).order("desc").collect(),
       ctx.db.query("uiItems").withIndex("by_user_and_group", (q) => q.eq("userId", profile._id).eq("group", "quick-actions")).collect(),
@@ -22,8 +22,15 @@ export const get = query({
       ctx.db.query("uiItems").withIndex("by_user_and_group", (q) => q.eq("userId", profile._id).eq("group", "plan-reviews")).collect(),
     ]);
 
+    const explanation = explanations.find((item) => item.active) ?? null;
+    const studyReadyNoteIds = new Set(explanations.flatMap((item) => item.noteId ? [String(item.noteId)] : []));
+    const notesWithStudyState = notes.map((note) => ({ ...note, studyReady: studyReadyNoteIds.has(String(note._id)), active: explanation?.noteId === note._id }));
     const planTasks = plan ? await ctx.db.query("revisionTasks").withIndex("by_plan_and_day", (q) => q.eq("planId", plan._id)).collect() : [];
     const activeQuiz = quizSets.find((quiz) => quiz.active) ?? null;
+    const quizzesWithQuestions = new Set((await Promise.all(quizSets.map(async (quiz) => {
+      const question = await ctx.db.query("quizQuestions").withIndex("by_quiz_and_order", (q) => q.eq("quizSetId", quiz._id)).first();
+      return question ? String(quiz._id) : null;
+    }))).filter((id): id is string => Boolean(id)));
     const quizQuestions = activeQuiz ? await ctx.db.query("quizQuestions").withIndex("by_quiz_and_order", (q) => q.eq("quizSetId", activeQuiz._id)).collect() : [];
     const leaderboard = activeQuiz ? await ctx.db.query("leaderboardEntries").withIndex("by_quiz_and_points", (q) => q.eq("quizSetId", activeQuiz._id)).order("desc").collect() : [];
     const [steps, keyPoints, relatedTopics, aiPrompts, messages] = explanation ? await Promise.all([
@@ -46,20 +53,21 @@ export const get = query({
     return {
       profile: publicProfile(profile),
       dashboard: {
+        isEmpty: notes.length === 0,
         stats: [
-          { label: "Study time", value: latestActivity ? `${Math.floor(latestActivity.studyMinutes / 60)}h ${latestActivity.studyMinutes % 60}m` : "0m", detail: "Daily goal: 2h", progress: latestActivity ? Math.min(100, Math.round((latestActivity.studyMinutes / 120) * 100)) : 0, tone: "violet" as const, icon: "◷" },
+          { label: "Study time", value: latestActivity ? `${Math.floor(latestActivity.studyMinutes / 60)}h ${latestActivity.studyMinutes % 60}m` : "0m", detail: `Daily goal: ${profile.dailyGoalMinutes ?? 60} min`, progress: latestActivity ? Math.min(100, Math.round((latestActivity.studyMinutes / (profile.dailyGoalMinutes ?? 60)) * 100)) : 0, tone: "violet" as const, icon: "◷" },
           { label: "Sessions done", value: `${latestActivity?.sessions ?? 0} / 7`, detail: "Daily goal: 7", progress: Math.min(100, Math.round(((latestActivity?.sessions ?? 0) / 7) * 100)), tone: "green" as const, icon: "✓" },
           { label: "Plan progress", value: `${planProgress}%`, detail: planProgress >= 50 ? "On track!" : "Keep going!", progress: planProgress, tone: "blue" as const, icon: "◎" },
           { label: "Points earned", value: String(latestActivity?.points ?? 0), detail: "Keep going!", progress: Math.min(100, Math.round(((latestActivity?.points ?? 0) / 500) * 100)), tone: "amber" as const, icon: "☆" },
         ],
         tasks: studyTasks,
-        suggestedQuizzes: quizSets.filter((quiz) => quiz.recommended && !quiz.active),
+        suggestedQuizzes: quizSets.filter((quiz) => quiz.recommended && !quiz.active && quizzesWithQuestions.has(String(quiz._id))),
         continueNote: notes[0] ?? null,
         quickActions,
         focusAreas: sortedMastery.slice(0, 3),
         tip,
       },
-      notes: { items: notes, workflow: uploadWorkflow },
+      notes: { items: notesWithStudyState, workflow: uploadWorkflow },
       study: explanation ? { ...explanation, steps, keyPoints, relatedTopics, prompts: aiPrompts, messages } : null,
       plan: plan ? { ...plan, tasks: planTasks, completedCount: completedPlanTasks, progress: planProgress, reviews: planReviews, nextTask: planTasks.find((task) => !task.completed) ?? null } : null,
       quiz: activeQuiz ? {

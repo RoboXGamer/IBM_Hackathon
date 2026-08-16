@@ -14,5 +14,5 @@ export async function requireProfile(ctx: DbCtx): Promise<Doc<"profiles">> {
   return profile;
 }
 export function publicProfile(profile: Doc<"profiles">) {
-  return { id: profile._id, name: profile.name, email: profile.email, grade: profile.grade, level: profile.level, points: profile.points, streak: profile.streak, avatarColor: profile.avatarColor, notificationCount: profile.notificationCount };
+  return { id: profile._id, name: profile.name, email: profile.email, grade: profile.grade, level: profile.level, points: profile.points, streak: profile.streak, avatarColor: profile.avatarColor, notificationCount: profile.notificationCount, onboardingComplete: profile.onboardingComplete ?? false, dailyGoalMinutes: profile.dailyGoalMinutes ?? 120, subjects: profile.subjects ?? [] };
 }

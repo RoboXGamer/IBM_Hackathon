@@ -15,6 +15,16 @@ Quizzly is a responsive AI study platform built as a Vite single-page app with S
 
 All learner-specific content and sample records shown by the product are stored in Convex. The frontend only contains interface copy, layout, and controls.
 
+## Draft 2 product flow
+
+- New accounts begin with honest zero-state data and a short grade, subject, and daily-goal onboarding flow.
+- Learners can upload their own notes or explicitly opt into the labeled sample workspace.
+- Dashboard task completion updates Convex activity and profile points.
+- Note rows expose processing readiness, search, safe opening, and deletion instead of sending every file to an unrelated explanation.
+- AI conversations persist, related-topic prompts work, and explanations support browser speech and sharing.
+- Plans support completion, progress reset, and CSV export.
+- Quizzes use server-side answer grading, a live timer, saved attempts, point updates, and mastery updates.
+
 ## Setup
 
 ```bash

@@ -1,4 +1,4 @@
-import { For, Show, createMemo } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import type { RoutePath } from "../types";
 import type { AppData } from "../data/types";
 import { Button, Card, IconBadge, Progress } from "../components/ui";
@@ -7,17 +7,37 @@ import { api } from "../data/live";
 
 export function PlanScreen(props: { navigate: (path: RoutePath) => void; data: AppData["plan"] }) {
   const toggleTask = createMutation(api.plans.toggleTask);
+  const resetPlan = createMutation(api.plans.reset);
+  const [notice, setNotice] = createSignal("");
+  const [resetting, setResetting] = createSignal(false);
   const totalMinutes = createMemo(() => props.data?.tasks.reduce((sum, task) => sum + task.durationMinutes, 0) ?? 0);
   const topicCount = createMemo(() => new Set(props.data?.tasks.flatMap((task) => task.topics) ?? []).size);
+  const exportPlan = () => {
+    const plan = props.data;
+    if (!plan) return;
+    const rows = ["Day,Session,Topics,Minutes,Completed", ...plan.tasks.map((task) => `${task.day},"${task.title}","${task.topics.join("; ")}",${task.durationMinutes},${task.completed ? "Yes" : "No"}`)];
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    const link = document.createElement("a"); link.href = url; link.download = `${plan.topic.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-revision-plan.csv`; link.click(); URL.revokeObjectURL(url);
+    setNotice("Revision plan exported.");
+  };
+  const reset = async () => {
+    const plan = props.data;
+    if (!plan || !window.confirm("Reset every session in this plan to incomplete?")) return;
+    setResetting(true); setNotice("");
+    try { await resetPlan({ planId: plan._id }); setNotice("Plan progress reset. Start again whenever you’re ready."); }
+    catch (reason) { setNotice(reason instanceof Error ? reason.message : "Could not reset this plan"); }
+    finally { setResetting(false); }
+  };
 
   return (
     <Show when={props.data} fallback={<Card><h2>No revision plan yet</h2><p>Upload notes to create a personalized plan.</p><Button onClick={() => props.navigate("/notes")}>Upload notes</Button></Card>}>
       {(plan) => <div class="page-stack">
-        <header class="study-toolbar"><Button variant="ghost" onClick={() => props.navigate("/notes")}>← Back to notes</Button><button class="document-picker"><IconBadge icon="▤" size="sm" />{plan().topic} — {plan().subject} <span>⌄</span></button><button class="icon-button" aria-label="More options">•••</button></header>
+        <header class="study-toolbar"><Button variant="ghost" onClick={() => props.navigate("/notes")}>← Back to notes</Button><div class="document-picker"><IconBadge icon="▤" size="sm" />{plan().topic} — {plan().subject}</div><Button variant="ghost" onClick={() => props.navigate("/performance")}>View progress</Button></header>
         <div class="content-with-rail">
           <div class="main-column">
             <Card>
-              <div class="section-heading"><div class="flex items-center gap-3"><IconBadge icon="◎" size="lg" /><div><h1 class="section-title">Your AI revision plan</h1><p>Personalized to help you master {plan().topic}</p></div></div><div class="flex gap-2"><Button variant="secondary">↻ Regenerate</Button><Button variant="secondary">↗ Export</Button></div></div>
+              <div class="section-heading"><div class="flex items-center gap-3"><IconBadge icon="◎" size="lg" /><div><h1 class="section-title">Your AI revision plan</h1><p>Personalized to help you master {plan().topic}</p></div></div><div class="flex gap-2"><Button variant="secondary" disabled={resetting()} onClick={() => void reset()}>{resetting() ? "Resetting…" : "↻ Reset progress"}</Button><Button variant="secondary" onClick={exportPlan}>↗ Export</Button></div></div>
+              <Show when={notice()}><div class="inline-notice"><span>i</span><p>{notice()}</p><button onClick={() => setNotice("")} aria-label="Dismiss">×</button></div></Show>
               <div class="plan-banner"><span class="banner-spark">✦</span><div><strong>Study smart, not hard.</strong><p>This plan balances topic difficulty, exam importance, and spaced repetition.</p></div><div class="target-art">◎<span>➤</span></div></div>
               <div class="plan-summary-grid">
                 <article><IconBadge icon="◷" size="lg" /><div><small>Total duration</small><strong>{plan().durationDays} days</strong><span>{Math.round(totalMinutes() / Math.max(1, plan().durationDays))} min/day</span></div></article>
