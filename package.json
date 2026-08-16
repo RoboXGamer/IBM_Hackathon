@@ -1,0 +1,28 @@
+{
+  "name": "quizzly-ai-study-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "check": "tsc -b --pretty false",
+    "preview": "vite preview",
+    "convex": "convex"
+  },
+  "dependencies": {
+    "@convex-dev/better-auth": "0.12.5",
+    "@solidjs/web": "2.0.0-rc.0",
+    "better-auth": "1.6.29",
+    "convex": "^1.44.0",
+    "solid-js": "2.0.0-rc.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.13.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.1",
+    "vite-plugin-solid": "3.0.0-next.27"
+  }
+}
