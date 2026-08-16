@@ -21,7 +21,6 @@ import type * as profiles from "../profiles.js";
 import type * as quizzes from "../quizzes.js";
 import type * as seed from "../seed.js";
 import type * as tasks from "../tasks.js";
-import type * as tasks from "../tasks.js";
 
 import type {
   ApiFromModules,
@@ -42,7 +41,6 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   quizzes: typeof quizzes;
   seed: typeof seed;
-  tasks: typeof tasks;
   tasks: typeof tasks;
 }>;
 

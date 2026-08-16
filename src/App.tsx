@@ -36,25 +36,40 @@ export default function App() {
 function DataApp() {
   const router = createSpaRouter();
   const data = createQuery(api.appData.get, {}) as Accessor<AppData | undefined>;
+  const [onboardingFinished, setOnboardingFinished] = createSignal(false);
   return (
     <Loading fallback={<div class="app-loading"><div class="logo-mark">Q</div><strong>Loading your study data…</strong></div>}>
       <Show when={data()}>
-        {(appDataAccessor) => {
-          const appData = appDataAccessor();
-          if (!appData.profile.onboardingComplete) return <OnboardingScreen name={appData.profile.name} />;
-          const screen = () => {
-            switch (router.path()) {
-              case "/notes": return <NotesScreen navigate={router.navigate} data={appData.notes} study={appData.study} />;
-              case "/study": return <StudyScreen navigate={router.navigate} data={appData.study} />;
-              case "/plan": return <PlanScreen navigate={router.navigate} data={appData.plan} />;
-              case "/quiz": return <QuizScreen navigate={router.navigate} data={appData.quiz} />;
-              case "/performance": return <PerformanceScreen navigate={router.navigate} data={appData.performance} />;
-              default: return <TodayScreen navigate={router.navigate} data={appData.dashboard} profile={appData.profile} />;
-            }
-          };
-          return <AppShell path={router.path} navigate={router.navigate} profile={appData.profile}>{screen()}</AppShell>;
-        }}
+        {(appDataAccessor) => <DataView data={appDataAccessor()} router={router} onboardingFinished={onboardingFinished()} onOnboardingComplete={() => setOnboardingFinished(true)} />}
       </Show>
     </Loading>
   );
+}
+
+type SpaRouter = ReturnType<typeof createSpaRouter>;
+
+function DataView(props: { data: AppData; router: SpaRouter; onboardingFinished: boolean; onOnboardingComplete: () => void }) {
+  return (
+    <Show
+      when={props.data.profile.onboardingComplete || props.onboardingFinished}
+      fallback={<OnboardingScreen name={props.data.profile.name} onComplete={props.onOnboardingComplete} />}
+    >
+      <Workspace data={props.data} router={props.router} />
+    </Show>
+  );
+}
+
+function Workspace(props: { data: AppData; router: SpaRouter }) {
+  const screen = () => {
+    const appData = props.data;
+    switch (props.router.path()) {
+      case "/notes": return <NotesScreen navigate={props.router.navigate} data={appData.notes} study={appData.study} />;
+      case "/study": return <StudyScreen navigate={props.router.navigate} data={appData.study} />;
+      case "/plan": return <PlanScreen navigate={props.router.navigate} data={appData.plan} />;
+      case "/quiz": return <QuizScreen navigate={props.router.navigate} data={appData.quiz} />;
+      case "/performance": return <PerformanceScreen navigate={props.router.navigate} data={appData.performance} />;
+      default: return <TodayScreen navigate={props.router.navigate} data={appData.dashboard} profile={appData.profile} />;
+    }
+  };
+  return <AppShell path={props.router.path} navigate={props.router.navigate} profile={props.data.profile}>{screen()}</AppShell>;
 }

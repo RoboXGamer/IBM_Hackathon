@@ -24,9 +24,9 @@ export function QuizScreen(props: { navigate: (path: RoutePath) => void; data: A
   const progress = createMemo(() => total() ? Math.round(((index() + (result() ? 1 : 0)) / total()) * 100) : 0);
   const secondsPerQuestion = createMemo(() => Math.max(20, Math.round((props.data?.durationMinutes ?? 1) * 60 / Math.max(1, total()))));
 
-  createEffect(() => ({ questionId: question()?._id, answered: Boolean(result()), done: finished() }), (state) => {
+  createEffect(() => ({ questionId: question()?._id, answered: Boolean(result()), done: finished(), seconds: secondsPerQuestion() }), (state) => {
     if (!state.questionId || state.answered || state.done) return;
-    setTimeLeft(secondsPerQuestion());
+    setTimeLeft(state.seconds);
     const timer = window.setInterval(() => setTimeLeft((value) => {
       if (value <= 1) { window.clearInterval(timer); return 0; }
       return value - 1;
